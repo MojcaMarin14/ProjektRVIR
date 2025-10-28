@@ -16,16 +16,10 @@ interface HistoryEntry {
 }
 
 const Statistics: React.FC = () => {
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [note, setNote] = useState<string>('');
-  const [weight, setWeight] = useState<string>('');
-  const [modalVisible, setModalVisible] = useState<boolean>(false);
-  const [editMode, setEditMode] = useState<boolean>(false);
-  const [yearModalVisible, setYearModalVisible] = useState<boolean>(false);
-  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
-  const { waterIntakeHistory, loadWaterIntakeHistory, setWaterIntakeHistory } = useWaterIntake();
+  const { waterIntakeHistory, loadWaterIntakeHistory } = useWaterIntake();
   const { user, loading } = useUser();
   const [dailyCalories, setDailyCalories] = useState<HistoryEntry[]>([]);
+  const [weightData, setWeightData] = useState<HistoryEntry[]>([]);
   const [dailyCalorieIntake, setDailyCalorieIntake] = useState(0);
   const [totalCaloriesConsumed, setTotalCaloriesConsumed] = useState<number>(0);
   const [lastUpdateDate, setLastUpdateDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -34,6 +28,7 @@ const Statistics: React.FC = () => {
     if (user) {
       loadWaterIntakeHistory();
       fetchDailyCalories();
+      fetchWeightHistory();
       const intake = calculateCalorieIntake(
         user.height,
         user.weight,
@@ -49,16 +44,41 @@ const Statistics: React.FC = () => {
   const fetchDailyCalories = async () => {
     try {
       if (user) {
-        const storedCalories = await AsyncStorage.getItem(`dailyCalories_${user.uid}`);
+        const storedCalories = await AsyncStorage.getItem(`dailyCalories_${user.id}`);
         if (storedCalories) {
           const parsedCalories = JSON.parse(storedCalories);
           setDailyCalories(parsedCalories);
-          const todayCalories = parsedCalories.find((entry: { date: string }) => entry.date === new Date().toISOString().split('T')[0])?.totalCalories || 0;
+          const todayCalories =
+            parsedCalories.find(
+              (entry: { date: string }) => entry.date === new Date().toISOString().split('T')[0]
+            )?.totalCalories || 0;
           setTotalCaloriesConsumed(todayCalories);
         }
       }
     } catch (error) {
       console.error('Error fetching daily calories:', error);
+    }
+  };
+
+  // 🔹 NALOŽI TEŽO IZ KOLEDARJA
+  const fetchWeightHistory = async () => {
+    try {
+      if (user) {
+        const storedWeights = await AsyncStorage.getItem(`markedDates_${user.id}`);
+        if (storedWeights) {
+          const parsed = JSON.parse(storedWeights);
+          const weightEntries = Object.keys(parsed)
+            .filter(date => parsed[date].weight && !isNaN(Number(parsed[date].weight)))
+            .map(date => ({
+              date,
+              weight: parseFloat(parsed[date].weight),
+            }))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          setWeightData(weightEntries);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading weight data:', error);
     }
   };
 
@@ -71,7 +91,8 @@ const Statistics: React.FC = () => {
       setLastUpdateDate(today);
     }
 
-    const millisTillMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0).getTime() - now.getTime();
+    const millisTillMidnight =
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0).getTime() - now.getTime();
     const timeoutId = setTimeout(() => {
       resetCalories();
       setLastUpdateDate(new Date().toISOString().split('T')[0]);
@@ -83,17 +104,30 @@ const Statistics: React.FC = () => {
   const resetCalories = async () => {
     if (!user) return;
     const newDate = new Date().toISOString().split('T')[0];
-    await AsyncStorage.setItem(`dailyCalories_${user.uid}`, JSON.stringify([{ date: newDate, totalCalories: 0 }]));
+    await AsyncStorage.setItem(
+      `dailyCalories_${user.id}`,
+      JSON.stringify([{ date: newDate, totalCalories: 0 }])
+    );
     setDailyCalories([{ date: newDate, totalCalories: 0 }]);
     setTotalCaloriesConsumed(0);
   };
 
-  // Prepare data for the water intake chart
+  // --- Data for charts ---
   const waterDates = waterIntakeHistory.filter(entry => entry.amount !== undefined).map(entry => entry.date);
   const waterAmounts = waterIntakeHistory.filter(entry => entry.amount !== undefined).map(entry => entry.amount!);
 
+  const calorieDates = dailyCalories.map(entry => entry.date);
+  const calorieAmounts = dailyCalories.map(entry => entry.totalCalories || 0);
+
+  const weightDates = weightData.map(entry => entry.date);
+  const weightValues = weightData.map(entry => entry.weight || 0);
+
   if (loading) {
-    return <View style={styles.loadingContainer}><Text>Loading...</Text></View>;
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading...</Text>
+      </View>
+    );
   }
 
   if (!user) {
@@ -106,6 +140,7 @@ const Statistics: React.FC = () => {
 
   return (
     <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
+      {/* 💧 Water Intake Chart */}
       <View style={styles.container}>
         <Text style={styles.title}>Water Intake History</Text>
         {waterAmounts.length > 0 ? (
@@ -116,54 +151,97 @@ const Statistics: React.FC = () => {
                 {
                   data: waterAmounts,
                   color: (opacity = 1) => `rgba(0, 123, 255, ${opacity})`,
-                  strokeWidth: 2,
                 },
               ],
             }}
             width={Dimensions.get('window').width - 40}
-            height={280}
-            yAxisLabel=""
+            height={260}
             yAxisSuffix="ml"
-            chartConfig={{
-              backgroundColor: '#f5f5f5',
-              backgroundGradientFrom: '#f5f5f5',
-              backgroundGradientTo: '#ffffff',
-              decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(0, 0, 139, ${opacity})`,
-              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-              style: {
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: '#ddd',
-              },
-              propsForDots: {
-                r: '6',
-                strokeWidth: '2',
-                stroke: '#00008B',
-              },
-              propsForBackgroundLines: {
-                strokeDasharray: '',
-              },
-            }}
+            chartConfig={chartConfig('#00008B')}
             bezier
-            style={{
-              marginVertical: 8,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: '#ddd',
-              marginHorizontal: 10,
-            }}
+            style={styles.chartStyle}
           />
         ) : (
-          <Text style={styles.noDataText}>No water intake data available.</Text>
+          <Text style={styles.noDataText}>No water data available.</Text>
         )}
       </View>
+
+      {/* 🔥 Daily Calorie Chart */}
+      <View style={styles.container}>
+        <Text style={styles.title}>Daily Calorie Intake</Text>
+        {calorieAmounts.length > 0 ? (
+          <LineChart
+            data={{
+              labels: calorieDates,
+              datasets: [
+                {
+                  data: calorieAmounts,
+                  color: (opacity = 1) => `rgba(255, 77, 166, ${opacity})`,
+                },
+              ],
+            }}
+            width={Dimensions.get('window').width - 40}
+            height={260}
+            yAxisSuffix=" kcal"
+            chartConfig={chartConfig('#ff4da6')}
+            bezier
+            style={styles.chartStyle}
+          />
+        ) : (
+          <Text style={styles.noDataText}>No calorie data available.</Text>
+        )}
+      </View>
+
+      {/* ⚖️ Weight Tracker Chart */}
+      <View style={styles.container}>
+        <Text style={styles.title}>Weight Tracker</Text>
+        {weightValues.length > 0 ? (
+          <LineChart
+            data={{
+              labels: weightDates,
+              datasets: [
+                {
+                  data: weightValues,
+                  color: (opacity = 1) => `rgba(0, 200, 83, ${opacity})`,
+                },
+              ],
+            }}
+            width={Dimensions.get('window').width - 40}
+            height={260}
+            yAxisSuffix=" kg"
+            chartConfig={chartConfig('#00C853')}
+            bezier
+            style={styles.chartStyle}
+          />
+        ) : (
+          <Text style={styles.noDataText}>No weight data available.</Text>
+        )}
+      </View>
+
       <View style={{ flex: 1 }}>
         <CalendarComponent />
       </View>
     </ScrollView>
   );
 };
+
+// --- Chart Config Helper ---
+const chartConfig = (color: string) => ({
+  backgroundColor: '#f5f5f5',
+  backgroundGradientFrom: '#f5f5f5',
+  backgroundGradientTo: '#ffffff',
+  decimalPlaces: 1,
+  color: (opacity = 1) => `${color}${Math.floor(opacity * 255).toString(16)}`,
+  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+  propsForDots: {
+    r: '5',
+    strokeWidth: '2',
+    stroke: color,
+  },
+  propsForBackgroundLines: {
+    strokeDasharray: '',
+  },
+});
 
 const styles = StyleSheet.create({
   scrollContainer: {
@@ -188,78 +266,17 @@ const styles = StyleSheet.create({
     color: '#000',
     fontFamily: 'SpaceMono-Regular',
   },
+  chartStyle: {
+    marginVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginHorizontal: 10,
+  },
   noDataText: {
     fontSize: 16,
     textAlign: 'center',
     marginTop: 20,
-  },
-  centeredView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 22,
-  },
-  modalView: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 35,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  button: {
-    borderRadius: 20,
-    padding: 10,
-    elevation: 2,
-    marginTop: 10,
-  },
-  buttonClose: {
-    backgroundColor: '#2196F3',
-  },
-  buttonEdit: {
-    backgroundColor: '#F39C12',
-  },
-  buttonRemove: {
-    backgroundColor: '#E74C3C',
-  },
-  textStyle: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  modalText: {
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  input: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    marginBottom: 10,
-    paddingLeft: 8,
-    width: 200,
-  },
-  noteInput: {
-    height: 80,
-  },
-  noteText: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  weightText: {
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  picker: {
-    height: 50,
-    width: 150,
   },
   notLoggedInContainer: {
     flex: 1,
@@ -270,44 +287,11 @@ const styles = StyleSheet.create({
   notLoggedInText: {
     fontSize: 18,
     color: '#000',
-    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  calorieInfoContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  calorieTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-    fontFamily: 'SpaceMono-Regular',
-    marginBottom: 5,
-  },
-  legendText: {
-    fontSize: 14,
-    color: '#000',
-    fontFamily: 'SpaceMono-Regular',
-    textAlign: 'center',
-    marginTop: 5,
-  },
-  legendContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-  chartContainer: {
-    marginVertical: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 10,
     backgroundColor: '#fff',
   },
 });

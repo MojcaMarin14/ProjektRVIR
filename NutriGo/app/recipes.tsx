@@ -93,7 +93,7 @@ const App: React.FC = () => {
 
   const fetchRecipes = () => {
     if (!query && healthLabels.length === 0 && dietLabels.length === 0 && !calories) {
-      alert('Please enter a search term or select a filter.');
+     
       return;
     }
 
