@@ -393,17 +393,19 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   pickerWrapper: {
-    backgroundColor: '#fff',
-    borderRadius: 25,
-    overflow: 'hidden',
-    width: '100%',
-    padding: 8,
-  },
-  picker: {
-    height: 40,
-    color: '#000',
-    flex: 1,
-  },
+  backgroundColor: '#fff',
+  borderRadius: 25,
+
+  borderWidth: 1,
+  borderColor: '#ccc',
+  justifyContent: 'center',
+},
+picker: {
+  height: 57, // ⬆️ povečaj višino
+  color: '#000',
+  fontSize: 16,
+  marginLeft: 8, // da ni zaliman na rob
+},
   shimmerOverlay: {
     ...StyleSheet.absoluteFillObject,
     opacity: 0.5,

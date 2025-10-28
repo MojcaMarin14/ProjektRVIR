@@ -1,15 +1,14 @@
 import React, { useEffect } from 'react';
-import { TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, TouchableOpacity, StyleSheet } from 'react-native';
 import { Slot, useRouter, usePathname } from 'expo-router';
-import { UserProvider } from '../context/UserContext';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { UserProvider, useUser } from '../context/UserContext';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApolloClient, InMemoryCache, ApolloProvider, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import styled from 'styled-components/native';
 import { FoodProvider } from '@/components/FoodList';
-import { getAuthInstance, firestore } from '../firebase/firebase';
-
+import { getAuthInstance } from '../firebase/firebase';
 
 // --- Apollo Client Setup ---
 const httpLink = createHttpLink({
@@ -30,12 +29,97 @@ const client = new ApolloClient({
 });
 
 // --- Glavni Layout ---
-const Layout = () => {
+const LayoutInner = () => {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { user, loading } = useUser();
 
-  // ✅ Inicializacija Firebase Auth po zagonu Expo
+  // 🔐 preveri login status po inicializaciji
+  useEffect(() => {
+    if (!loading && !user && pathname !== '/login' && pathname !== '/register') {
+      router.replace('/login');
+    }
+  }, [user, loading, pathname]);
+
+  // ⏳ če še nalaga, pokaži spinner (ampak po hookih!)
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="pink" />
+      </View>
+    );
+  }
+
+  const hideNavbarOn = ['/login', '/register', '/SuccessScreen'];
+
+  return (
+    <Container>
+      <Content>
+        <Slot />
+      </Content>
+
+      {!hideNavbarOn.includes(pathname) && (
+        <NavbarWrapper>
+          <Navbar paddingBottom={insets.bottom}>
+            <NavButton onPress={() => router.push('/plan')}>
+              <Ionicons
+                name="checkbox-sharp"
+                size={24}
+                color={pathname === '/plan' ? 'pink' : 'grey'}
+              />
+              {pathname === '/plan' && <PinkDot />}
+            </NavButton>
+
+            <NavButton onPress={() => router.push('/statistics')}>
+              <Ionicons
+                name="stats-chart"
+                size={24}
+                color={pathname === '/statistics' ? 'pink' : 'grey'}
+              />
+              {pathname === '/statistics' && <PinkDot />}
+            </NavButton>
+
+            <NavButton onPress={() => router.push('/recipes')}>
+              <Ionicons
+                name="search-sharp"
+                size={24}
+                color={pathname === '/recipes' ? 'pink' : 'grey'}
+              />
+              {pathname === '/recipes' && <PinkDot />}
+            </NavButton>
+
+            <NavButton onPress={() => router.push('/tracker')}>
+              <Ionicons
+                name="nutrition"
+                size={24}
+                color={pathname === '/tracker' ? 'pink' : 'grey'}
+              />
+              {pathname === '/tracker' && <PinkDot />}
+            </NavButton>
+
+            <NavButton onPress={() => router.push('/profile')}>
+              <Ionicons
+                name="person"
+                size={24}
+                color={
+                  pathname === '/profile' || pathname === '/login'
+                    ? 'pink'
+                    : 'grey'
+                }
+              />
+              {(pathname === '/profile' || pathname === '/login') && <PinkDot />}
+            </NavButton>
+          </Navbar>
+        </NavbarWrapper>
+      )}
+    </Container>
+  );
+};
+ 
+
+// --- Glavni Layout z vsemi providerji ---
+export default function Layout() {
   useEffect(() => {
     getAuthInstance();
   }, []);
@@ -43,81 +127,33 @@ const Layout = () => {
   return (
     <ApolloProvider client={client}>
       <SafeAreaProvider>
-        {/* ✅ UserProvider mora biti NAD FoodProvider */}
         <UserProvider>
           <FoodProvider>
-            <Container>
-              <Content>
-                <Slot />
-              </Content>
-
-              <Navbar paddingBottom={insets.bottom}>
-                <NavButton onPress={() => router.push('/plan')}>
-                  <Ionicons
-                    name="checkbox-sharp"
-                    size={24}
-                    color={pathname === '/plan' ? 'pink' : 'grey'}
-                  />
-                  {pathname === '/plan' && <PinkDot />}
-                </NavButton>
-
-                <NavButton onPress={() => router.push('/statistics')}>
-                  <Ionicons
-                    name="stats-chart"
-                    size={24}
-                    color={pathname === '/statistics' ? 'pink' : 'grey'}
-                  />
-                  {pathname === '/statistics' && <PinkDot />}
-                </NavButton>
-
-                <NavButton onPress={() => router.push('/recipes')}>
-                  <Ionicons
-                    name="search-sharp"
-                    size={24}
-                    color={pathname === '/recipes' ? 'pink' : 'grey'}
-                  />
-                  {pathname === '/recipes' && <PinkDot />}
-                </NavButton>
-
-                <NavButton onPress={() => router.push('/tracker')}>
-                  <Ionicons
-                    name="nutrition"
-                    size={24}
-                    color={pathname === '/tracker' ? 'pink' : 'grey'}
-                  />
-                  {pathname === '/tracker' && <PinkDot />}
-                </NavButton>
-
-                <NavButton onPress={() => router.push('/login')}>
-                  <Ionicons
-                    name="person"
-                    size={24}
-                    color={
-                      pathname === '/profile' || pathname === '/login'
-                        ? 'pink'
-                        : 'grey'
-                    }
-                  />
-                  {(pathname === '/profile' || pathname === '/login') && <PinkDot />}
-                </NavButton>
-              </Navbar>
-            </Container>
+            <LayoutInner />
           </FoodProvider>
         </UserProvider>
       </SafeAreaProvider>
     </ApolloProvider>
   );
-};
+}
 
 // --- Styled Components ---
 const Container = styled.View`
   flex: 1;
-  justify-content: space-between;
   background-color: white;
 `;
 
 const Content = styled.View`
   flex: 1;
+  background-color: white;
+`;
+
+const NavbarWrapper = styled.View`
+  position: absolute;
+  bottom: 25px;
+  left: 15px;
+  right: 15px;
+  z-index: 100;
 `;
 
 interface NavbarProps {
@@ -125,13 +161,18 @@ interface NavbarProps {
 }
 
 const Navbar = styled.View<NavbarProps>`
-  height: 60px;
+  height: 65px;
   flex-direction: row;
   justify-content: space-around;
   align-items: center;
   background-color: white;
+  border-radius: 30px;
   padding-bottom: ${(props) => props.paddingBottom}px;
-  padding-horizontal: 10px;
+  elevation: 10;
+  shadow-color: #000;
+  shadow-offset: 0px 2px;
+  shadow-opacity: 0.1;
+  shadow-radius: 6px;
 `;
 
 const NavButton = styled(TouchableOpacity)`
@@ -147,7 +188,7 @@ const PinkDot = styled.View`
   border-radius: 4px;
   background-color: pink;
   position: absolute;
-  bottom: -4px;
+  bottom: 4px;
 `;
 
 const styles = StyleSheet.create({
@@ -164,5 +205,3 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 });
-
-export default Layout;

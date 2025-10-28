@@ -15,7 +15,7 @@ const firebaseConfig = {
   measurementId: 'G-3Y1T1MEP3W',
 };
 
-// ✅ Inicializacija samo enkrat
+// ✅ Inicializacija Firebase samo enkrat
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
@@ -23,24 +23,40 @@ if (!firebase.apps.length) {
 const auth = firebase.auth();
 const firestore = firebase.firestore();
 
-// ✅ Nastavi, da Firebase uporablja AsyncStorage namesto localStorage
-auth.setPersistence({
-  type: 'LOCAL',
-  async set(key, value) {
-    await AsyncStorage.setItem(key, value);
-  },
-  async get(key) {
-    return (await AsyncStorage.getItem(key));
-  },
-  async remove(key) {
-    await AsyncStorage.removeItem(key);
-  },
-})
-  .then(() => console.log('✅ Firebase Auth persistence set to AsyncStorage'))
-  .catch((err) => console.error('❌ Failed to set persistence:', err));
+/**
+ * 🔥 “Compat” Firebase Auth v Expo/React Native ne podpira native persistence,
+ * zato to rešimo ročno z AsyncStorage in onAuthStateChanged listenerjem.
+ */
 
+// 🔹 Shranjevanje prijave v AsyncStorage
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    await AsyncStorage.setItem('firebaseUser', JSON.stringify(user));
+    console.log('✅ User persisted to AsyncStorage');
+  } else {
+    await AsyncStorage.removeItem('firebaseUser');
+    console.log('🚪 User logged out, storage cleared');
+  }
+});
+
+// 🔹 Funkcija za pridobitev Auth instance
 export function getAuthInstance() {
   return auth;
+}
+
+// 🔹 Funkcija za obnovitev uporabnika iz AsyncStorage (če Firebase ne ohrani seje)
+export async function restoreUserSession() {
+  const stored = await AsyncStorage.getItem('firebaseUser');
+  if (stored) {
+    try {
+      const user = JSON.parse(stored);
+      console.log('🔁 Restored user from AsyncStorage:', user.email);
+      return user;
+    } catch (e) {
+      console.warn('⚠️ Failed to parse stored user:', e);
+    }
+  }
+  return null;
 }
 
 export { firebase, auth, firestore };

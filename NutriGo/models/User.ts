@@ -30,9 +30,9 @@ export interface User {
   age: number;
   height: number;
   weight: number;
-  activityLevel: ActivityLevel | undefined; // Allow undefined
-  goal: Goal | undefined; // Allow undefined
+  activityLevel: ActivityLevel | undefined| "";
+  goal: Goal | undefined| "";
   name: string;
-  gender: 'male' | 'female' | 'other'| undefined;
+  gender: 'male' | 'female' | 'other'| undefined| "";
   calorieIntake: number;
   }
