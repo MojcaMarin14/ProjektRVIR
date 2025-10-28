@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   View,
@@ -5,11 +6,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
   Text,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import ModalSelector from 'react-native-modal-selector';
 import { getAuthInstance, firestore } from '../firebase/firebase';
 import { setDoc, doc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -17,8 +19,6 @@ import { ActivityLevel, Goal, User } from '../models/User';
 import { LinearGradient } from 'expo-linear-gradient';
 import { userActivityLevelToText, userGoalToText } from '@/models/functions';
 import { useRouter } from 'expo-router';
-
-const { width } = Dimensions.get('window');
 
 const RegistrationForm: React.FC = () => {
   const [user, setUser] = useState<User>({
@@ -52,66 +52,60 @@ const RegistrationForm: React.FC = () => {
 
     try {
       const auth = getAuthInstance();
-      if (!auth) {
-        setAlertMessage('Authentication is not available in this environment.');
-        setAlertVisible(true);
-        return;
-      }
-
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        user.email,
-        user.password
-      );
+      const userCredential = await createUserWithEmailAndPassword(auth, user.email, user.password);
       const firebaseUser = userCredential.user;
 
       if (firebaseUser) {
-        console.log('✅ User added with ID:', firebaseUser.uid);
         const userData = { ...user, id: firebaseUser.uid };
         await setDoc(doc(firestore, 'users', firebaseUser.uid), userData);
         router.push({ pathname: '/SuccessScreen', params: { name: user.name } });
       }
     } catch (error: any) {
-      console.error('❌ Error adding user:', error);
-      if (error.code === 'auth/email-already-in-use') {
-        setAlertMessage('Email already in use.');
-      } else {
-        setAlertMessage('Registration Failed. Please try again.');
-      }
+      console.error('❌ Registration error:', error);
+      setAlertMessage('Registration failed. Try again.');
       setAlertVisible(true);
     }
   };
 
-  const closeAlert = () => {
-    setAlertVisible(false);
-  };
-
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollViewContent}>
+    <KeyboardAvoidingView
+      style={styles.keyboardAvoid}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollViewContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.innerContainer}>
-          <Text style={styles.title}>Registration</Text>
+          <Text style={styles.title}>Create Your Account</Text>
+          <TouchableOpacity
+  style={styles.backButton}
+  onPress={() => router.back()}
+>
+  <Ionicons name="arrow-back" size={24} color="#000" />
+  <Text style={styles.backText}>Back</Text>
+</TouchableOpacity>
 
-          {/* NAME */}
+          {/* INPUTS */}
           <LinearGradient colors={['#92a3fd', '#9dceff']} style={styles.gradientBorder}>
             <View style={styles.inputWrapper}>
               <TextInput
                 placeholder="Name"
                 value={user.name}
-                onChangeText={(value) => handleInputChange('name', value)}
+                onChangeText={(v) => handleInputChange('name', v)}
                 style={styles.input}
                 placeholderTextColor="#999"
               />
             </View>
           </LinearGradient>
 
-          {/* EMAIL */}
           <LinearGradient colors={['#92a3fd', '#9dceff']} style={styles.gradientBorder}>
             <View style={styles.inputWrapper}>
               <TextInput
                 placeholder="Email"
                 value={user.email}
-                onChangeText={(value) => handleInputChange('email', value)}
+                onChangeText={(v) => handleInputChange('email', v)}
                 style={styles.input}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -120,13 +114,12 @@ const RegistrationForm: React.FC = () => {
             </View>
           </LinearGradient>
 
-          {/* PASSWORD */}
           <LinearGradient colors={['#92a3fd', '#9dceff']} style={styles.gradientBorder}>
             <View style={styles.inputWrapper}>
               <TextInput
                 placeholder="Password"
                 value={user.password}
-                onChangeText={(value) => handleInputChange('password', value)}
+                onChangeText={(v) => handleInputChange('password', v)}
                 style={styles.input}
                 secureTextEntry
                 placeholderTextColor="#999"
@@ -134,102 +127,62 @@ const RegistrationForm: React.FC = () => {
             </View>
           </LinearGradient>
 
-          {/* AGE + HEIGHT */}
-          <View style={styles.rowContainer}>
-            <LinearGradient colors={['#92a3fd', '#9dceff']} style={[styles.gradientBorder, styles.smallInputContainer]}>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  placeholder="Age"
-                  value={user.age ? user.age.toString() : ''}
-                  onChangeText={(value) => handleInputChange('age', parseInt(value) || 0)}
-                  style={styles.smallInput}
-                  keyboardType="numeric"
-                  placeholderTextColor="#999"
-                />
-              </View>
-            </LinearGradient>
-
-            <LinearGradient colors={['#92a3fd', '#9dceff']} style={[styles.gradientBorder, styles.smallInputContainer]}>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  placeholder="Height (cm)"
-                  value={user.height ? user.height.toString() : ''}
-                  onChangeText={(value) => handleInputChange('height', parseInt(value) || 0)}
-                  style={styles.smallInput}
-                  keyboardType="numeric"
-                  placeholderTextColor="#999"
-                />
-              </View>
-            </LinearGradient>
+          {/* PICKERS */}
+          <View style={styles.pickerBox}>
+            <ModalSelector
+              data={[
+                { key: 'bmr', label: userActivityLevelToText(ActivityLevel.BMR) },
+                { key: 'sedentary', label: userActivityLevelToText(ActivityLevel.SEDENTARY) },
+                { key: 'light', label: userActivityLevelToText(ActivityLevel.LIGHT) },
+                { key: 'moderate', label: userActivityLevelToText(ActivityLevel.MODERATE) },
+                { key: 'active', label: userActivityLevelToText(ActivityLevel.ACTIVE) },
+                { key: 'very_active', label: userActivityLevelToText(ActivityLevel.VERY_ACTIVE) },
+                { key: 'extra_active', label: userActivityLevelToText(ActivityLevel.EXTRA_ACTIVE) },
+              ]}
+              initValue="Select Activity Level"
+              onChange={(option) => handleInputChange('activityLevel', option.key)}
+            >
+              <Text style={styles.pickerText}>
+                {user.activityLevel
+                  ? userActivityLevelToText(user.activityLevel as ActivityLevel)
+                  : 'Select Activity Level'}
+              </Text>
+            </ModalSelector>
           </View>
 
-          {/* WEIGHT */}
-          <LinearGradient colors={['#92a3fd', '#9dceff']} style={[styles.gradientBorder, styles.smallInputContainer]}>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                placeholder="Weight (kg)"
-                value={user.weight ? user.weight.toString() : ''}
-                onChangeText={(value) => handleInputChange('weight', parseInt(value) || 0)}
-                style={styles.smallInput}
-                keyboardType="numeric"
-                placeholderTextColor="#999"
-              />
-            </View>
-          </LinearGradient>
+          <View style={styles.pickerBox}>
+            <ModalSelector
+              data={[
+                { key: 'weight_loss', label: userGoalToText(Goal.WEIGHT_LOSS) },
+                { key: 'muscle_gain', label: userGoalToText(Goal.MUSCLE_GAIN) },
+                { key: 'maintenance', label: userGoalToText(Goal.MAINTENANCE) },
+                { key: 'extreme_weight_loss', label: userGoalToText(Goal.EXTREME_WEIGHT_LOSS) },
+                { key: 'mild_weight_loss', label: userGoalToText(Goal.MILD_WEIGHT_LOSS) },
+              ]}
+              initValue="Select Goal"
+              onChange={(option) => handleInputChange('goal', option.key)}
+            >
+              <Text style={styles.pickerText}>
+                {user.goal ? userGoalToText(user.goal as Goal) : 'Select Goal'}
+              </Text>
+            </ModalSelector>
+          </View>
 
-          {/* ACTIVITY LEVEL */}
-          <LinearGradient colors={['#92a3fd', '#9dceff']} style={styles.gradientBorder}>
-            <View style={styles.pickerWrapper}>
-              <Picker
-                selectedValue={user.activityLevel || ''}
-                onValueChange={(itemValue) => handleInputChange('activityLevel', itemValue)}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select Activity Level" value="" />
-                <Picker.Item label={userActivityLevelToText(ActivityLevel.BMR)} value={ActivityLevel.BMR} />
-                <Picker.Item label={userActivityLevelToText(ActivityLevel.SEDENTARY)} value={ActivityLevel.SEDENTARY} />
-                <Picker.Item label={userActivityLevelToText(ActivityLevel.LIGHT)} value={ActivityLevel.LIGHT} />
-                <Picker.Item label={userActivityLevelToText(ActivityLevel.MODERATE)} value={ActivityLevel.MODERATE} />
-                <Picker.Item label={userActivityLevelToText(ActivityLevel.ACTIVE)} value={ActivityLevel.ACTIVE} />
-                <Picker.Item label={userActivityLevelToText(ActivityLevel.VERY_ACTIVE)} value={ActivityLevel.VERY_ACTIVE} />
-                <Picker.Item label={userActivityLevelToText(ActivityLevel.EXTRA_ACTIVE)} value={ActivityLevel.EXTRA_ACTIVE} />
-              </Picker>
-            </View>
-          </LinearGradient>
-
-          {/* GOAL */}
-          <LinearGradient colors={['#92a3fd', '#9dceff']} style={styles.gradientBorder}>
-            <View style={styles.pickerWrapper}>
-              <Picker
-                selectedValue={user.goal || ''}
-                onValueChange={(itemValue) => handleInputChange('goal', itemValue)}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select Goal" value="" />
-                <Picker.Item label={userGoalToText(Goal.WEIGHT_LOSS)} value={Goal.WEIGHT_LOSS} />
-                <Picker.Item label={userGoalToText(Goal.MUSCLE_GAIN)} value={Goal.MUSCLE_GAIN} />
-                <Picker.Item label={userGoalToText(Goal.MAINTENANCE)} value={Goal.MAINTENANCE} />
-                <Picker.Item label={userGoalToText(Goal.EXTREME_WEIGHT_LOSS)} value={Goal.EXTREME_WEIGHT_LOSS} />
-                <Picker.Item label={userGoalToText(Goal.MILD_WEIGHT_LOSS)} value={Goal.MILD_WEIGHT_LOSS} />
-              </Picker>
-            </View>
-          </LinearGradient>
-
-          {/* GENDER */}
-          <LinearGradient colors={['#92a3fd', '#9dceff']} style={styles.gradientBorder}>
-            <View style={styles.pickerWrapper}>
-              <Picker
-                selectedValue={user.gender || ''}
-                onValueChange={(itemValue) => handleInputChange('gender', itemValue)}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select Gender" value="" />
-                <Picker.Item label="Male" value="male" />
-                <Picker.Item label="Female" value="female" />
-                <Picker.Item label="Other" value="other" />
-              </Picker>
-            </View>
-          </LinearGradient>
+          <View style={styles.pickerBox}>
+            <ModalSelector
+              data={[
+                { key: 'male', label: 'Male' },
+                { key: 'female', label: 'Female' },
+                { key: 'other', label: 'Other' },
+              ]}
+              initValue="Select Gender"
+              onChange={(option) => handleInputChange('gender', option.key)}
+            >
+              <Text style={styles.pickerText}>
+                {user.gender ? user.gender : 'Select Gender'}
+              </Text>
+            </ModalSelector>
+          </View>
 
           {/* BUTTON */}
           <TouchableOpacity style={styles.button} onPress={handleRegister}>
@@ -239,53 +192,92 @@ const RegistrationForm: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* ALERT MODAL */}
-      <Modal transparent visible={alertVisible} animationType="slide" onRequestClose={closeAlert}>
+      {/* ALERT */}
+      <Modal transparent visible={alertVisible} animationType="slide">
         <View style={styles.modalBackground}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalText}>{alertMessage}</Text>
-            <TouchableOpacity onPress={closeAlert} style={styles.closeButton}>
+            <TouchableOpacity onPress={() => setAlertVisible(false)} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
+// 💅 Styles
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  scrollViewContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 50 },
-  innerContainer: { alignItems: 'center', padding: 16, width: '100%' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10, textAlign: 'center', color: '#000' },
-  gradientBorder: { width: '100%', padding: 2, borderRadius: 25, marginVertical: 10 },
-  inputWrapper: { backgroundColor: '#fff', borderRadius: 25, overflow: 'hidden' },
-  input: { width: '100%', padding: 12, color: '#000' },
-  rowContainer: { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
-  smallInputContainer: { width: '48%' },
-  smallInput: { paddingVertical: 8, paddingHorizontal: 12, color: '#000', fontSize: 14 },
-  pickerWrapper: {
-  backgroundColor: '#fff',
-  borderRadius: 25,
-
-  borderWidth: 1,
-  borderColor: '#ccc',
-  justifyContent: 'center',
+  backButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  alignSelf: 'flex-start',
+  marginBottom: 10,
 },
-picker: {
-  height: 57, // ⬆️ povečaj višino
+backText: {
   color: '#000',
   fontSize: 16,
-  marginLeft: 8, // da ni zaliman na rob
+  marginLeft: 6,
 },
 
-  button: { width: '60%', height: 50, marginVertical: 16, borderRadius: 25, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  keyboardAvoid: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 100, // prostor za navbar
+  },
+  innerContainer: {
+    width: '90%',
+    alignItems: 'center',
+  },
+  title: { fontSize: 26, fontWeight: 'bold', marginBottom: 20, color: '#000' },
+
+  gradientBorder: { width: '100%', padding: 2, borderRadius: 25, marginVertical: 10 },
+  inputWrapper: { backgroundColor: '#fff', borderRadius: 25 },
+  input: { padding: 12, color: '#000' },
+
+  pickerBox: {
+    width: '100%',
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 14,
+    marginVertical: 8,
+    backgroundColor: '#fff',
+  },
+  pickerText: { color: '#333', fontSize: 16 },
+
+  button: {
+    width: '60%',
+    height: 50,
+    marginTop: 20,
+    borderRadius: 25,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  modalBackground: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalContainer: { width: '80%', padding: 20, backgroundColor: '#fff', borderRadius: 10, alignItems: 'center' },
-  modalText: { color: '#000', fontSize: 16, textAlign: 'center', marginBottom: 20 },
-  closeButton: { backgroundColor: '#ff007f', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 25 },
+
+  modalBackground: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalContainer: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalText: { color: '#000', fontSize: 16, marginBottom: 20, textAlign: 'center' },
+  closeButton: { backgroundColor: '#ff007f', padding: 10, borderRadius: 25 },
   closeButtonText: { color: '#fff', fontSize: 16 },
 });
 

@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TextInput, TouchableOpacity, ScrollView, Animated } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useUser } from '../context/UserContext';
@@ -7,11 +18,12 @@ import { signOut } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { getAuthInstance, firestore } from '../firebase/firebase';
 import { ActivityLevel, Goal, User } from '../models/User';
-import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { userActivityLevelToText, userGoalToText } from '@/models/functions';
-import { Picker } from '@react-native-picker/picker';
+import RNPickerSelect from 'react-native-picker-select';
+
+const safeLabel = (text?: string) => text ?? '';
 
 const Profile: React.FC = () => {
   const { user, setUser } = useUser();
@@ -23,9 +35,7 @@ const Profile: React.FC = () => {
   useEffect(() => {
     if (user) {
       setLocalUser(user);
-      if (user.image) {
-        loadImageBase64(user.image);
-      }
+      if (user.image) loadImageBase64(user.image);
     } else {
       setLocalUser(null);
     }
@@ -48,31 +58,19 @@ const Profile: React.FC = () => {
     ).start();
   }, [shimmerAnimation]);
 
-  const shimmerTranslate = shimmerAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-300, 300],
-  });
-
   const loadImageBase64 = async (uri: string) => {
     try {
-      console.log('Loading image from URI:', uri);
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: 'base64',
-      });
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
       setImageBase64(`data:image/jpeg;base64,${base64}`);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('java.io.FileNotFoundException')) {
-        console.warn('File not found, but proceeding as the image displays correctly:', error.message);
-      } else {
-        console.error('Error loading image base64:', error);
-      }
+      console.error('Error loading image base64:', error);
     }
   };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      alert('Sorry, we need camera roll permissions to make this work!');
+      alert('Permission to access photos is required!');
       return;
     }
 
@@ -83,35 +81,23 @@ const Profile: React.FC = () => {
       quality: 1,
     });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
+    if (!result.canceled && result.assets?.length) {
       const uri = result.assets[0].uri;
       const fileName = uri.split('/').pop();
-
-      const docDir = (FileSystem as any).documentDirectory ?? (FileSystem as any).cacheDirectory ?? null;
+      const docDir = (FileSystem as any).documentDirectory ?? (FileSystem as any).cacheDirectory;
       if (docDir) {
         const newPath = docDir + fileName;
-
-        try {
-          await FileSystem.copyAsync({
-            from: uri,
-            to: newPath,
-          });
-
-          if (localUser) {
-            const updatedUser = { ...localUser, image: newPath };
-            setLocalUser(updatedUser);
-            setImageBase64(uri); // Set the URI directly for immediate display
-            const auth = getAuthInstance();
-            if (auth && auth.currentUser) {
-              await setDoc(doc(firestore, 'users', auth.currentUser.uid), { image: newPath }, { merge: true });
-              setUser(updatedUser);
-            }
+        await FileSystem.copyAsync({ from: uri, to: newPath });
+        if (localUser) {
+          const updatedUser = { ...localUser, image: newPath };
+          setLocalUser(updatedUser);
+          setImageBase64(uri);
+          const auth = getAuthInstance();
+          if (auth?.currentUser) {
+            await setDoc(doc(firestore, 'users', auth.currentUser.uid), { image: newPath }, { merge: true });
+            setUser(updatedUser);
           }
-        } catch (error) {
-          console.error('Error copying file:', error);
         }
-      } else {
-        console.error('FileSystem.documentDirectory is null');
       }
     }
   };
@@ -125,213 +111,155 @@ const Profile: React.FC = () => {
 
   const handleInputChange = (field: keyof User, value: string | number) => {
     if (localUser) {
-      // Preverite, ali je polje "name" in posodobite vrednost brez preverjanja na številko
-      const updatedUser = { ...localUser, [field]: field === 'name' ? value : value !== '' && !isNaN(Number(value)) ? Number(value) : '' };
-      setLocalUser(updatedUser);
-      const auth = getAuthInstance();
-      if (auth && auth.currentUser) {
-        setDoc(doc(firestore, 'users', auth.currentUser.uid), { [field]: updatedUser[field] }, { merge: true });
-        setUser(updatedUser);
-      }
-    }
-  };
-
-  const handlePickerChange = async (field: keyof User, value: string | number) => {
-    if (localUser) {
       const updatedUser = { ...localUser, [field]: value };
       setLocalUser(updatedUser);
       const auth = getAuthInstance();
-      if (auth && auth.currentUser) {
-        await setDoc(doc(firestore, 'users', auth.currentUser.uid), { [field]: value }, { merge: true });
+      if (auth?.currentUser) {
+        setDoc(doc(firestore, 'users', auth.currentUser.uid), { [field]: value }, { merge: true });
         setUser(updatedUser);
       }
     }
   };
 
-  const defaultImage = localUser?.gender === 'female'
-    ? require('../assets/images/female-icon.png')
-    : require('../assets/images/male-icon.png');
+  const defaultImage =
+    localUser?.gender === 'female'
+      ? require('../assets/images/female-icon.png')
+      : require('../assets/images/male-icon.png');
+
+  const goalOptions = Object.values(Goal).map((g) => ({
+    label: safeLabel(userGoalToText(g)),
+    value: g,
+  }));
+
+  const activityOptions = Object.values(ActivityLevel).map((a) => ({
+    label: safeLabel(userActivityLevelToText(a)),
+    value: a,
+  }));
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.title}>Profile</Text>
-      <View style={styles.imageContainer}>
-        <Image source={imageBase64 ? { uri: imageBase64 } : defaultImage} style={styles.profileImage} />
-        <TouchableOpacity style={styles.iconButton} onPress={pickImage}>
-          <MaterialIcons name="edit" size={24} color="black" />
+    <KeyboardAvoidingView
+      style={styles.keyboardAvoid}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="always"
+      >
+        {/* BACK BUTTON */}
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#000" />
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
-      </View>
-     
-      <Text style={styles.email}>{localUser?.email}</Text>
-      <Text style={styles.label1}>Edit your data:</Text>
-      <Text style={styles.label}>Name</Text>
-      <View style={styles.inputContainer}>
-        <LinearGradient
-          colors={['#92a3fd', '#9dceff']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradientBorder}
-        >
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.input}
-              placeholder="Name"
-              value={localUser?.name || ''}
-              onChangeText={(value) => handleInputChange('name', value)}
-              placeholderTextColor="#999"
-            />
-          </View>
-        </LinearGradient>
-      </View>
-      <Text style={styles.label}>Goal</Text>
-      <View style={styles.inputContainer}>
-        <LinearGradient
-          colors={['#92a3fd', '#9dceff']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradientBorder}
-        >
-          <View style={styles.pickerWrapper}>
-            <Picker
-              selectedValue={localUser?.goal}
-              onValueChange={(itemValue) => handlePickerChange('goal', itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item label="Select Goal" value={undefined} />
-              <Picker.Item label={userGoalToText(Goal.WEIGHT_LOSS)} value={Goal.WEIGHT_LOSS} />
-              <Picker.Item label={userGoalToText(Goal.MILD_WEIGHT_LOSS)} value={Goal.MILD_WEIGHT_LOSS} />
-              <Picker.Item label={userGoalToText(Goal.EXTREME_WEIGHT_LOSS)} value={Goal.EXTREME_WEIGHT_LOSS} />
-              <Picker.Item label={userGoalToText(Goal.MUSCLE_GAIN)} value={Goal.MUSCLE_GAIN} />
-              <Picker.Item label={userGoalToText(Goal.MAINTENANCE)} value={Goal.MAINTENANCE} />
-            </Picker>
-          </View>
-        </LinearGradient>
-      </View>
-      <Text style={styles.label}>Activity Level</Text>
-      <View style={styles.inputContainer}>
-        <LinearGradient
-          colors={['#92a3fd', '#9dceff']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradientBorder}
-        >
-          <View style={styles.pickerWrapper}>
-            <Picker
-              selectedValue={localUser?.activityLevel}
-              onValueChange={(itemValue) => handlePickerChange('activityLevel', itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item label="Select Activity Level" value={undefined} />
-              <Picker.Item label={userActivityLevelToText(ActivityLevel.BMR)} value={ActivityLevel.BMR} />
-              <Picker.Item label={userActivityLevelToText(ActivityLevel.SEDENTARY)} value={ActivityLevel.SEDENTARY} />
-              <Picker.Item label={userActivityLevelToText(ActivityLevel.LIGHT)} value={ActivityLevel.LIGHT} />
-              <Picker.Item label={userActivityLevelToText(ActivityLevel.MODERATE)} value={ActivityLevel.MODERATE} />
-              <Picker.Item label={userActivityLevelToText(ActivityLevel.ACTIVE)} value={ActivityLevel.ACTIVE} />
-              <Picker.Item label={userActivityLevelToText(ActivityLevel.VERY_ACTIVE)} value={ActivityLevel.VERY_ACTIVE} />
-              <Picker.Item label={userActivityLevelToText(ActivityLevel.EXTRA_ACTIVE)} value={ActivityLevel.EXTRA_ACTIVE} />
-            </Picker>
-          </View>
-        </LinearGradient>
-      </View>
-      <Text style={styles.label}>Height (cm)</Text>
-      <View style={styles.inputContainer}>
-        <LinearGradient
-          colors={['#92a3fd', '#9dceff']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradientBorder}
-        >
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.input}
-              placeholder="Height (cm)"
-              value={localUser?.height?.toString() || ''}
-              onChangeText={(value) => handleInputChange('height', value)}
-              keyboardType="numeric"
-              placeholderTextColor="#999"
-            />
-          </View>
-        </LinearGradient>
-      </View>
-      <Text style={styles.label}>Weight (kg)</Text>
-      <View style={styles.inputContainer}>
-        <LinearGradient
-          colors={['#92a3fd', '#9dceff']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradientBorder}
-        >
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.input}
-              placeholder="Weight (kg)"
-              value={localUser?.weight?.toString() || ''}
-              onChangeText={(value) => handleInputChange('weight', value)}
-              keyboardType="numeric"
-              placeholderTextColor="#999"
-            />
-          </View>
-        </LinearGradient>
-        
-      </View>
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <LinearGradient
-          colors={['#92a3fd', '#9dceff']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <Animated.View
-          style={[
-            styles.shimmerOverlay,
-            { transform: [{ translateX: shimmerTranslate }] },
-          ]}
-        >
-          <LinearGradient
-            colors={['transparent', 'rgba(255, 255, 255, 0.5)', 'transparent']}
-            start={{ x: 0, y: 1 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
+
+        <Text style={styles.title}>Profile</Text>
+
+        {/* PROFILE IMAGE */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={imageBase64 ? { uri: imageBase64 } : defaultImage}
+            style={styles.profileImage}
           />
-        </Animated.View>
-        <Text style={styles.logoutButtonText}>Logout</Text>
-        
-      </TouchableOpacity>
-      <Text style={styles.label2}>Go to first page to see plans</Text>
-    </ScrollView>
-    
+          <TouchableOpacity style={styles.iconButton} onPress={pickImage}>
+            <MaterialIcons name="edit" size={24} color="black" />
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.email}>{localUser?.email}</Text>
+        <Text style={styles.label1}>Edit your data:</Text>
+
+        {/* NAME */}
+        <Text style={styles.label}>Name</Text>
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.input}
+            placeholder="Name"
+            value={localUser?.name || ''}
+            onChangeText={(value) => handleInputChange('name', value)}
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        {/* GOAL */}
+        <Text style={styles.label}>Goal</Text>
+        <View style={styles.pickerWrapper}>
+          <RNPickerSelect
+            onValueChange={(value) => handleInputChange('goal', value)}
+            items={goalOptions}
+            placeholder={{ label: 'Select Goal', value: null }}
+            value={localUser?.goal || null}
+            style={pickerSelectStyles}
+            useNativeAndroidPickerStyle={false}
+            doneText="Done"
+          />
+        </View>
+
+        {/* ACTIVITY LEVEL */}
+        <Text style={styles.label}>Activity Level</Text>
+        <View style={styles.pickerWrapper}>
+          <RNPickerSelect
+            onValueChange={(value) => handleInputChange('activityLevel', value)}
+            items={activityOptions}
+            placeholder={{ label: 'Select Activity Level', value: null }}
+            value={localUser?.activityLevel || null}
+            style={pickerSelectStyles}
+            useNativeAndroidPickerStyle={false}
+            doneText="Done"
+          />
+        </View>
+
+        {/* HEIGHT */}
+        <Text style={styles.label}>Height (cm)</Text>
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.input}
+            placeholder="Height (cm)"
+            value={localUser?.height?.toString() || ''}
+            onChangeText={(value) => handleInputChange('height', value)}
+            keyboardType="numeric"
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        {/* WEIGHT */}
+        <Text style={styles.label}>Weight (kg)</Text>
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.input}
+            placeholder="Weight (kg)"
+            value={localUser?.weight?.toString() || ''}
+            onChangeText={(value) => handleInputChange('weight', value)}
+            keyboardType="numeric"
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        {/* LOGOUT */}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutButtonText}>Logout</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardAvoid: { flex: 1, backgroundColor: '#fff' },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
     backgroundColor: '#fff',
   },
-  container: {
-    width: '100%',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 20,
-    fontFamily: 'SpaceMono-Regular',
-
-  },
-  imageContainer: {
-    position: 'relative',
-    marginBottom: 20,
+  backButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 10,
   },
-  profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
+  backText: { color: '#000', fontSize: 16, marginLeft: 6 },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#000', marginBottom: 20 },
+  imageContainer: { position: 'relative', marginBottom: 20, alignItems: 'center' },
+  profileImage: { width: 100, height: 100, borderRadius: 50 },
   iconButton: {
     position: 'absolute',
     bottom: 0,
@@ -340,90 +268,52 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 4,
   },
-  email: {
-    fontSize: 18,
-    color: '#000',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  label: {
-    width: '100%',
-    marginBottom: 5,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  label1: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    fontFamily: 'SpaceMono-Regular',
-    marginBottom: 10,
-  },
-  label2: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#333',
-    fontFamily: 'SpaceMono-Regular',
-    marginBottom: 10,
-  },
-  inputContainer: {
-    width: '100%',
-    marginVertical: 10,
-    borderRadius: 25,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 25,
-    elevation: 10,
-  },
-  gradientBorder: {
-    padding: 2,
-    borderRadius: 25,
-  },
+  email: { fontSize: 18, color: '#000', marginBottom: 20 },
+  label1: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 10 },
+  label: { width: '100%', marginBottom: 5, fontWeight: 'bold', color: '#000' },
   inputWrapper: {
     backgroundColor: '#fff',
     borderRadius: 25,
-    overflow: 'hidden',
-  },
-  input: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 25,
-    color: '#000',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    marginVertical: 10,
+    width: '100%',
   },
   pickerWrapper: {
-  backgroundColor: '#fff',
-  borderRadius: 25,
-
-  borderWidth: 1,
-  borderColor: '#ccc',
-  justifyContent: 'center',
-},
-picker: {
-  height: 57, // ⬆️ povečaj višino
-  color: '#000',
-  fontSize: 16,
-  marginLeft: 8, // da ni zaliman na rob
-},
-  shimmerOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.5,
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    marginVertical: 10,
+    width: '100%',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
   },
+  input: { paddingVertical: 10, paddingHorizontal: 15, borderRadius: 25, color: '#000' },
   logoutButton: {
     width: '60%',
     height: 50,
     marginVertical: 16,
     borderRadius: 25,
-    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#9dceff',
   },
-  logoutButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    position: 'relative',
-    zIndex: 1,
+  logoutButtonText: { color: '#fff', fontWeight: 'bold' },
+});
+
+const pickerSelectStyles = StyleSheet.create({
+  inputIOS: {
+    fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    color: '#000',
+  },
+  inputAndroid: {
+    fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    color: '#000',
   },
 });
 

@@ -1,5 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Text, TouchableOpacity, View, ScrollView, SafeAreaView, StyleSheet, Animated, Image, Dimensions, ActivityIndicator, PanResponder } from 'react-native';
+import {
+  Text,
+  TouchableOpacity,
+  View,
+  ScrollView,
+  SafeAreaView,
+  StyleSheet,
+  Animated,
+  Image,
+  Dimensions,
+  ActivityIndicator,
+  PanResponder,
+  Platform,
+} from 'react-native';
+import Constants from 'expo-constants';
 import { useFonts } from 'expo-font';
 import ErrorBoundary from 'react-native-error-boundary';
 import SearchForm from '../components/SearchForm';
@@ -46,6 +60,9 @@ const App: React.FC = () => {
 
   const screenHeight = Dimensions.get('window').height;
 
+  // ✅ Preverjanje platforme (Android Expo)
+  const isAndroidExpo = Platform.OS === 'android' && Constants?.appOwnership === 'expo';
+
   useEffect(() => {
     if (fontsLoaded) {
       Animated.loop(
@@ -73,65 +90,65 @@ const App: React.FC = () => {
       });
     }
   }, [loading, screenHeight]);
-const fetchRecipes = () => {
-  if (!query && healthLabels.length === 0 && dietLabels.length === 0 && !calories) {
-    alert('Please enter a search term or select a filter.');
-    return;
-  }
 
-  setLoading(true);
-  setRecipes(null);
-  setErrorMessage('');
+  const fetchRecipes = () => {
+    if (!query && healthLabels.length === 0 && dietLabels.length === 0 && !calories) {
+      alert('Please enter a search term or select a filter.');
+      return;
+    }
 
-  const params = new URLSearchParams();
-  params.append('app_id', '900da95e');
-  params.append('app_key', '40698503668e0bb3897581f4766d77f9');
-  params.append('q', query);
+    setLoading(true);
+    setRecipes(null);
+    setErrorMessage('');
 
-  if (healthLabels.length > 0) {
-    healthLabels.forEach((label) => params.append('health', label));
-  }
-  if (dietLabels.length > 0) {
-    dietLabels.forEach((label) => params.append('diet', label));
-  }
-  if (calories) {
-    params.append('calories', `0-${calories}`);
-  }
+    const params = new URLSearchParams();
+    params.append('app_id', '900da95e');
+    params.append('app_key', '40698503668e0bb3897581f4766d77f9');
+    params.append('q', query);
 
-  const url = `https://api.edamam.com/api/recipes/v2?type=public&${params.toString()}`;
-  console.log('Fetching URL:', url);
+    if (healthLabels.length > 0) {
+      healthLabels.forEach((label) => params.append('health', label));
+    }
+    if (dietLabels.length > 0) {
+      dietLabels.forEach((label) => params.append('diet', label));
+    }
+    if (calories) {
+      params.append('calories', `0-${calories}`);
+    }
 
-  fetch(url, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  })
-    .then((response) => {
-      if (!response.ok) {
-        if (response.status === 403) throw new Error('Invalid app_id or app_key.');
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      return response.json();
+    const url = `https://api.edamam.com/api/recipes/v2?type=public&${params.toString()}`;
+    console.log('Fetching URL:', url);
+
+    fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
     })
-    .then((data) => {
-      const results = data.hits || data.hits === undefined ? data.hits : data.hits;
-      if (data.hits && data.hits.length > 0) {
-        const filteredRecipes = data.hits
-          .map((hit: any) => hit.recipe)
-          .filter((recipe: Recipe) => !calories || recipe.calories <= parseFloat(calories));
-        setRecipes(filteredRecipes);
-      } else {
-        setRecipes([]);
-        setErrorMessage('No recipes found.');
-      }
-      setLoading(false);
-    })
-    .catch((error) => {
-      console.error('Error:', error);
-      setLoading(false);
-      alert(error.message);
-    });
-};
-
+      .then((response) => {
+        if (!response.ok) {
+          if (response.status === 403) throw new Error('Invalid app_id or app_key.');
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        const results = data.hits || data.hits === undefined ? data.hits : data.hits;
+        if (data.hits && data.hits.length > 0) {
+          const filteredRecipes = data.hits
+            .map((hit: any) => hit.recipe)
+            .filter((recipe: Recipe) => !calories || recipe.calories <= parseFloat(calories));
+          setRecipes(filteredRecipes);
+        } else {
+          setRecipes([]);
+          setErrorMessage('No recipes found.');
+        }
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+        setLoading(false);
+        alert(error.message);
+      });
+  };
 
   const openModal = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
@@ -176,11 +193,17 @@ const fetchRecipes = () => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
       <View style={styles.container}>
-        <View style={styles.glitterWrapper} pointerEvents="none"></View>
+        {/* ✅ pointerEvents popravek za Android Expo */}
+      <View
+  style={styles.glitterWrapper}
+  pointerEvents={isAndroidExpo ? 'box-none' : 'none'}
+></View>
+
+
         <ScrollView
           ref={scrollViewRef}
           contentContainerStyle={styles.scrollViewContent}
-          {...panResponder.panHandlers}
+          {...(isAndroidExpo ? {} : panResponder.panHandlers)} // ✅ izključi PanResponder za Android Expo
         >
           <View style={styles.innerContainer}>
             <Text style={styles.title}>Recipe Search</Text>
@@ -195,9 +218,18 @@ const fetchRecipes = () => {
               setCalories={setCalories}
               fetchRecipes={fetchRecipes}
             />
-            {loading && <Image style={styles.splashImage} source={require('../assets/images/fruit.gif')} />}
-            {!loading && recipes && recipes.length > 0 && <RecipeList data={recipes} openModal={openModal} />}
-            {!loading && recipes && recipes.length === 0 && <Text style={styles.errorMessage}>{errorMessage}</Text>}
+            {loading && (
+              <Image
+                style={styles.splashImage}
+                source={require('../assets/images/fruit.gif')}
+              />
+            )}
+            {!loading && recipes && recipes.length > 0 && (
+              <RecipeList data={recipes} openModal={openModal} />
+            )}
+            {!loading && recipes && recipes.length === 0 && (
+              <Text style={styles.errorMessage}>{errorMessage}</Text>
+            )}
             {recipes && (
               <View style={styles.buttonRow}>
                 <Animated.View style={[styles.hideButton, animatedStyle]}>
@@ -235,7 +267,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: '#fff', // Ensure background is white
+    backgroundColor: '#fff',
   },
   title: {
     fontSize: 24,
@@ -265,7 +297,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 22,
   },
-
   hideButtonText: {
     color: '#fff',
     fontWeight: 'bold',
@@ -279,7 +310,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     zIndex: 1,
-    pointerEvents: 'none',
   },
   errorMessage: {
     textAlign: 'center',
@@ -291,12 +321,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff', // Ensure background is white
+    backgroundColor: '#fff',
   },
 });
 
 const AppWithErrorBoundary: React.FC = () => (
-  <ErrorBoundary onError={(error: Error) => console.error('Error caught by ErrorBoundary:', error)}>
+  <ErrorBoundary
+    onError={(error: Error) =>
+      console.error('Error caught by ErrorBoundary:', error)
+    }
+  >
     <App />
   </ErrorBoundary>
 );
