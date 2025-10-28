@@ -73,68 +73,65 @@ const App: React.FC = () => {
       });
     }
   }, [loading, screenHeight]);
+const fetchRecipes = () => {
+  if (!query && healthLabels.length === 0 && dietLabels.length === 0 && !calories) {
+    alert('Please enter a search term or select a filter.');
+    return;
+  }
 
-  const fetchRecipes = () => {
-    if (!query && healthLabels.length === 0 && dietLabels.length === 0 && !calories) {
-      alert('Please enter a search term or select a filter.');
-      return;
-    }
+  setLoading(true);
+  setRecipes(null);
+  setErrorMessage('');
 
-    setLoading(true);
-    setRecipes(null);
-    setErrorMessage('');
+  const params = new URLSearchParams();
+  params.append('app_id', '900da95e');
+  params.append('app_key', '40698503668e0bb3897581f4766d77f9');
+  params.append('q', query);
 
-    const params = new URLSearchParams();
-    params.append('app_id', '900da95e');
-    params.append('app_key', '40698503668e0bb3897581f4766d77f9');
-    params.append('q', query);
+  if (healthLabels.length > 0) {
+    healthLabels.forEach((label) => params.append('health', label));
+  }
+  if (dietLabels.length > 0) {
+    dietLabels.forEach((label) => params.append('diet', label));
+  }
+  if (calories) {
+    params.append('calories', `0-${calories}`);
+  }
 
-    if (healthLabels.length > 0) {
-      healthLabels.forEach((label) => params.append('health', label));
-    }
-    if (dietLabels.length > 0) {
-      dietLabels.forEach((label) => params.append('diet', label));
-    }
-    if (calories) {
-      params.append('calories', `0-${calories}`);
-    }
+  const url = `https://api.edamam.com/api/recipes/v2?type=public&${params.toString()}`;
+  console.log('Fetching URL:', url);
 
-    const url = `https://api.edamam.com/search?${params.toString()}`;
-    console.log('Fetching URL:', url);
-
-    fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+  fetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  })
+    .then((response) => {
+      if (!response.ok) {
+        if (response.status === 403) throw new Error('Invalid app_id or app_key.');
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      return response.json();
     })
-      .then((response) => {
-        if (!response.ok) {
-          if (response.status === 403) {
-            throw new Error('Food with that parameters not found, try other filters');
-          }
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((data) => {
-        if (data.hits.length > 0) {
-          const filteredRecipes = data.hits
-            .map((hit: any) => hit.recipe)
-            .filter((recipe: Recipe) => !calories || recipe.calories <= parseFloat(calories));
-          setRecipes(filteredRecipes);
-        } else {
-          setRecipes([]);
-          setErrorMessage('No such recipes found');
-        }
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error('Error:', error);
-        setLoading(false);
-        alert(error.message);
-      });
-  };
+    .then((data) => {
+      const results = data.hits || data.hits === undefined ? data.hits : data.hits;
+      if (data.hits && data.hits.length > 0) {
+        const filteredRecipes = data.hits
+          .map((hit: any) => hit.recipe)
+          .filter((recipe: Recipe) => !calories || recipe.calories <= parseFloat(calories));
+        setRecipes(filteredRecipes);
+      } else {
+        setRecipes([]);
+        setErrorMessage('No recipes found.');
+      }
+      setLoading(false);
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+      setLoading(false);
+      alert(error.message);
+    });
+};
+
 
   const openModal = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
