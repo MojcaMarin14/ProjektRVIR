@@ -22,7 +22,7 @@ const SplashScreen = () => {
         NutriGo
         <Text style={styles.highlight}>X</Text>
       </Text>
-      <Text style={styles.subtitle}>Be bold, be FIT</Text>
+      <Text style={styles.subtitle}>Be bold, be fit</Text>
       <TouchableOpacity onPress={handleGetStarted}>
         <LinearGradient
           colors={['#92a3fd', '#9dceff']}
