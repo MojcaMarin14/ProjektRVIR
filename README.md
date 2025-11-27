@@ -16,3 +16,92 @@ Funkcionalnosti mobilne aplikacije:
   - Edamam API
   - Stepzen GraphQL
   - Apollo Client
+
+
+# NutriGo - Praktikum II
+
+## 📖 Celotna dokumentacija
+Za podrobnejši in formalni opis projekta si prenesite originalni DOCX dokument: [dokumentacija.docx](dokumentacija/dokumentacija.docx)
+
+---
+
+## 1. Namen aplikacije
+
+[cite_start]NutriGo je mobilna aplikacija za spremljanje prehrane, telesne teže, hidracije ter osebnega napredka[cite: 3]. [cite_start]Uporabniku omogoča ustvarjanje računa, urejanje profila, beleženje kalorij, iskanje receptov in pregled statistike v preglednih grafih[cite: 4]. [cite_start]Aplikacija je namenjena podpori pri doseganju osebnih prehranskih ciljev[cite: 5].
+
+---
+
+## 2. Glavne funkcionalnosti
+
+### Uvodni zaslon
+[cite_start]Prikaz logotipa in gumb za začetek[cite: 8].
+
+<img src="dokumentacija/Screenshots/IMG_7978.PNG" alt="Uvodni zaslon" width="300"/>
+
+### Registracija in prijava
+[cite_start]Uporabnik lahko ustvari račun ter določi osnovne podatke, kot so ime, email, cilj, spol, nivo aktivnosti in geslo[cite: 10].
+
+<img src="dokumentacija/Screenshots/IMG_7979.PNG" alt="Registracija - Create Account" width="300"/>
+<img src="dokumentacija/Screenshots/IMG_7980.PNG" alt="Registracija - Welcome" width="300"/>
+
+### Profil uporabnika
+[cite_start]Možnost urejanja vseh osebnih podatkov, spremljanje višine, teže, ciljev in nivoja aktivnosti[cite: 12].
+
+<img src="dokumentacija/Screenshots/IMG_7981.PNG" alt="Profil uporabnika" width="300"/>
+
+### Dnevni vnos kalorij in hrane
+[cite_start]Vnos kalorij, pregled skupnega dnevnega vnosa ter iskanje hrane po API-ju[cite: 14].
+
+<img src="dokumentacija/Screenshots/IMG_7982.PNG" alt="Dnevni vnos kalorij" width="300"/>
+
+### Iskanje receptov
+[cite_start]Uporabnik lahko išče recepte glede na sestavine, kalorije in različne prehranske oznake (npr. vegetarijansko, brez glutena)[cite: 16].
+
+<img src="dokumentacija/Screenshots/IMG_7983.PNG" alt="Iskanje receptov - Iskalnik" width="300"/>
+<img src="dokumentacija/Screenshots/IMG_7984.PNG" alt="Iskanje receptov - Prikaz" width="300"/>
+
+### Statistika in sledenje
+[cite_start]Aplikacija prikazuje napredek v obliki grafov: dnevni vnos kalorij [cite: 19][cite_start], hidracija [cite: 20] [cite_start]in spremljanje teže[cite: 21].
+
+<img src="dokumentacija/Screenshots/IMG_7985.PNG" alt="Grafi statistike" width="300"/>
+
+### Glavna nadzorna plošča
+[cite_start]Povzetek uporabnikovih podatkov: dnevni kalorijski plan, BMI, makrohranila, mikrohranila in voda[cite: 23].
+
+<img src="dokumentacija/Screenshots/IMG_7986.PNG" alt="Nadzorna plošča - Povzetek" width="300"/>
+<img src="dokumentacija/Screenshots/IMG_7987.PNG" alt="Nadzorna plošča - Voda" width="300"/>
+
+---
+
+## 3. Tehnološki opis
+
+[cite_start]Aplikacija je razvita kot mobilna rešitev z uporabo modernih spletnih in mobilnih tehnologij[cite: 25]. [cite_start]Temelji na arhitekturi **React Native** in deluje znotraj **Expo** okolja, kar omogoča hitro testiranje na fizični napravi[cite: 26]. [cite_start]Za shranjevanje podatkov aplikacija uporablja lokalni pomnilnik naprave, za pridobivanje receptov pa uporablja zunanji API[cite: 27].
+
+### 🛠 Tehnologije mobilne aplikacije
+
+- React Native
+- Typescript
+- Firebase
+- Expo Router
+- Edamam API
+- Stepzen GraphQL
+- Apollo Client
+
+---
+
+## 4. Zaključek
+
+[cite_start]NutriGo je celovita mobilna aplikacija za podporo uporabnikom pri uravnavanju prehrane in spremljanju zdravja[cite: 29]. [cite_start]Aplikacija združuje pregledno uporabniško izkušnjo, personalizirane izračune in podatkovno podprto iskanje receptov[cite: 30]. [cite_start]Primerna je za vsakogar, ki želi spremljati svoj napredek ali preprosto izboljšati svoje prehranske navade[cite: 31].
+
+---
+
+## 🚀 NutriGo - Inicializacija
+
+### Potrebni ukazi
+
+Za zagon projekta sledite tem korakom (potrebno je namestiti npm in Node.js):
+
+```bash
+cd NutriGo
+npm install --legacy-peer-deps
+npx expo start
