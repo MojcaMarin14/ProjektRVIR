@@ -89,7 +89,32 @@ Za podrobnejši in formalni opis projekta si prenesite originalni DOCX dokument:
 
 ---
 
-## 4. Zaključek
+## 4. Struktura podatkovne baze (Firebase NoSQL)
+
+Rešitev uporablja NoSQL podatkovno bazo **Firebase** za shranjevanje podatkov.
+
+### Primer strukture uporabnika (User)
+
+Trenutno se uporablja samo struktura uporabnika:
+
+```json
+{
+  "activityLevel": "Light: exercise 1-3 times/week",
+  "age": 22,
+  "calorieIntake": 0,
+  "email": "Lea@example.com",
+  "gender": "female",
+  "goal": "Mild weight loss",
+  "height": 170,
+  "id": "p3Sz8Tu82NPrvoeroQMNT4qQqS73",
+  "name": "Lea",
+  "password": "lea123",
+  "weight": 62
+}
+```
+---
+
+## 5. Zaključek
 
 [cite_start]NutriGo je celovita mobilna aplikacija za podporo uporabnikom pri uravnavanju prehrane in spremljanju zdravja[cite: 29]. [cite_start]Aplikacija združuje pregledno uporabniško izkušnjo, personalizirane izračune in podatkovno podprto iskanje receptov[cite: 30]. [cite_start]Primerna je za vsakogar, ki želi spremljati svoj napredek ali preprosto izboljšati svoje prehranske navade[cite: 31].
 
@@ -103,5 +128,7 @@ Za zagon projekta sledite tem korakom (potrebno je namestiti npm in Node.js):
 
 ```bash
 cd NutriGo
+rm package-lock.json
+npm cache clean --force
 npm install --legacy-peer-deps
-npx expo start
+npx expo start -c
