@@ -6,7 +6,7 @@ Funkcionalnosti mobilne aplikacije:
 - Uporabniki lahko uporabijo kamero za skeniranje BAR kod izdelkov. Če izdelek obstaja v bazi mu ga predlaga, če ne ga vnese ročno
 - Priporočanje receptov glede na cilj uporabnika (izguba teže, pridobivanje mase), cilj izbere ob registraciji ali ga kasneje spremeni
 - Vnašanje in sledenje dnevne teže uporabnika
-- Dnevna analiza vnosov - tortni graf deležev hidratov, maščob in beljakovin
+- Dnevna analiza vnosov - graficni prikaz statistike vnosa vode, hrane, teze
 
   Tehnologije mobilne aplikacije:
   - React Native
